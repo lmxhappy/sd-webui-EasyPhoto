@@ -1,10 +1,12 @@
+import os
 import launch
 
 
-if not launch.is_installed("cv2"):
-    print('Installing requirements for paiya-webui')
-    launch.run_pip("install opencv-python", "requirements for opencv")
-
-if not launch.is_installed("tensorflow"):
-    print('Installing requirements for paiya-webui')
-    launch.run_pip("install tensorflow", "requirements for tensorflow")
+req_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+         'requirements.txt')
+with open(req_file) as f:
+    for lib in f:
+        lib = lib.strip()
+        if not launch.is_installed(lib):
+            print('pip install {}'.format(lib))
+            launch.run_pip(f'install {lib}', f'sd-webui requirement: {lib}')
