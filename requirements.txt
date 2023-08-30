@@ -1,0 +1,4 @@
+modelscope
+tensorflow
+insightface
+ifnude
