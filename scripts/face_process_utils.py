@@ -1,23 +1,12 @@
-import copy
-import glob
-import logging
-import os
-import random
-import sys
-
 import cv2
-import gradio as gr
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.model_zoo as modelzoo
 import torchvision.transforms as transforms
-from modelscope.outputs import OutputKeys
-from modelscope.pipelines import pipeline
-from modelscope.utils.constant import Tasks
 from PIL import Image
 from skimage import transform
+
 
 def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, mask_type):
     '''
@@ -40,14 +29,18 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
         retinaface_mask_pils = []
         for index in range(len(retinaface_result['boxes'])):
             # 获得retinaface的box并做扩充
-            retinaface_box      = np.array(retinaface_result['boxes'][index])
-            face_width          = retinaface_box[2] - retinaface_box[0]
-            face_height         = retinaface_box[3] - retinaface_box[1]
-            retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
-            retinaface_box[1]   = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 2, 0, h - 1)
-            retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
-            retinaface_box[3]   = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 2, 0, h - 1)
-            retinaface_box      = np.array(retinaface_box, np.int32)
+            retinaface_box = np.array(retinaface_result['boxes'][index])
+            face_width = retinaface_box[2] - retinaface_box[0]
+            face_height = retinaface_box[3] - retinaface_box[1]
+            retinaface_box[0] = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0,
+                                        w - 1)
+            retinaface_box[1] = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 2, 0,
+                                        h - 1)
+            retinaface_box[2] = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0,
+                                        w - 1)
+            retinaface_box[3] = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 2, 0,
+                                        h - 1)
+            retinaface_box = np.array(retinaface_box, np.int32)
             retinaface_boxs.append(retinaface_box)
 
             # 检测关键点
@@ -56,30 +49,32 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
             retinaface_keypoints.append(retinaface_keypoint)
 
             # mask部分
-            retinaface_crop     = image.crop(np.int32(retinaface_box))
-            retinaface_mask     = np.zeros_like(np.array(image, np.uint8))
+            retinaface_crop = image.crop(np.int32(retinaface_box))
+            retinaface_mask = np.zeros_like(np.array(image, np.uint8))
             if mask_type == "skin":
                 retinaface_sub_mask = face_seg(retinaface_crop)
-                retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = np.expand_dims(retinaface_sub_mask, -1)
+                retinaface_mask[retinaface_box[1]:retinaface_box[3],
+                retinaface_box[0]:retinaface_box[2]] = np.expand_dims(retinaface_sub_mask, -1)
             else:
                 retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
             retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
             retinaface_mask_pils.append(retinaface_mask_pil)
 
-        retinaface_boxs         = np.array(retinaface_boxs)
-        argindex                = np.argsort(retinaface_boxs[:, 0])
-        retinaface_boxs         = [retinaface_boxs[index] for index in argindex]
-        retinaface_keypoints    = [retinaface_keypoints[index] for index in argindex]
-        retinaface_mask_pils    = [retinaface_mask_pils[index] for index in argindex]
+        retinaface_boxs = np.array(retinaface_boxs)
+        argindex = np.argsort(retinaface_boxs[:, 0])
+        retinaface_boxs = [retinaface_boxs[index] for index in argindex]
+        retinaface_keypoints = [retinaface_keypoints[index] for index in argindex]
+        retinaface_mask_pils = [retinaface_mask_pils[index] for index in argindex]
         return retinaface_boxs, retinaface_keypoints, retinaface_mask_pils
-        
+
     else:
-        retinaface_box          = np.array([])
-        retinaface_keypoints    = np.array([])
-        retinaface_mask         = np.zeros_like(np.array(image, np.uint8))
-        retinaface_mask_pil     = Image.fromarray(np.uint8(retinaface_mask))
-            
+        retinaface_box = np.array([])
+        retinaface_keypoints = np.array([])
+        retinaface_mask = np.zeros_like(np.array(image, np.uint8))
+        retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
+
         return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
 
 def crop_and_paste(source_image, source_image_mask, target_image, source_five_point, target_five_point, source_box):
     """
@@ -103,31 +98,34 @@ def crop_and_paste(source_image, source_image_mask, target_image, source_five_po
     """
     source_five_point = np.reshape(source_five_point, [5, 2]) - np.array(source_box[:2])
     target_five_point = np.reshape(target_five_point, [5, 2])
+    source_five_point, target_five_point = np.array(source_five_point), np.array(target_five_point)
 
-    crop_source_image                       = source_image.crop(np.int32(source_box))
-    crop_source_image_mask                  = source_image_mask.crop(np.int32(source_box))
-    source_five_point, target_five_point    = np.array(source_five_point), np.array(target_five_point)
+    # 从原图/mask图，crop出来脸/脸mask
+    crop_source_image = source_image.crop(np.int32(source_box))
+    crop_source_image_mask = source_image_mask.crop(np.int32(source_box))
 
     tform = transform.SimilarityTransform()
     # 程序直接估算出转换矩阵M
     tform.estimate(source_five_point, target_five_point)
     M = tform.params[0:2, :]
 
-    warped      = cv2.warpAffine(np.array(crop_source_image), M, np.shape(target_image)[:2][::-1], borderValue=0.0)
+    warped = cv2.warpAffine(np.array(crop_source_image), M, np.shape(target_image)[:2][::-1], borderValue=0.0)
     warped_mask = cv2.warpAffine(np.array(crop_source_image_mask), M, np.shape(target_image)[:2][::-1], borderValue=0.0)
 
-    mask        = np.float32(warped_mask == 0)
-    output      = mask * np.float32(target_image) + (1 - mask) * np.float32(warped)
+    mask = np.float32(warped_mask == 0)
+    output = mask * np.float32(target_image) + (1 - mask) * np.float32(warped)
     return output
 
 
 def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     # retinaface detect 
-    retinaface_result                                           = retinaface_detection(image) 
+    retinaface_result = retinaface_detection(image)
     # get mask and keypoints
-    retinaface_box, retinaface_keypoints, retinaface_mask_pil   = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
+    retinaface_box, retinaface_keypoints, retinaface_mask_pil = safe_get_box_mask_keypoints(image, retinaface_result,
+                                                                                            crop_ratio, None, "crop")
 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
 
 def color_transfer(sc, dc):
     """
@@ -151,16 +149,18 @@ def color_transfer(sc, dc):
     s_mean, s_std = get_mean_and_std(sc)
     dc = cv2.cvtColor(dc, cv2.COLOR_BGR2LAB)
     t_mean, t_std = get_mean_and_std(dc)
-    img_n = ((sc-s_mean)*(t_std/s_std))+t_mean
+    img_n = ((sc - s_mean) * (t_std / s_std)) + t_mean
     np.putmask(img_n, img_n > 255, 255)
     np.putmask(img_n, img_n < 0, 0)
     dst = cv2.cvtColor(cv2.convertScaleAbs(img_n), cv2.COLOR_LAB2BGR)
     return dst
 
+
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
+
 
 class BasicBlock(nn.Module):
     def __init__(self, in_chan, out_chan, stride=1):
@@ -176,7 +176,7 @@ class BasicBlock(nn.Module):
                 nn.Conv2d(in_chan, out_chan,
                           kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(out_chan),
-                )
+            )
 
     def forward(self, x):
         residual = self.conv1(x)
@@ -192,11 +192,13 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
         return out
 
+
 def create_layer_basic(in_chan, out_chan, bnum, stride=1):
     layers = [BasicBlock(in_chan, out_chan, stride=stride)]
-    for i in range(bnum-1):
+    for i in range(bnum - 1):
         layers.append(BasicBlock(out_chan, out_chan, stride=1))
     return nn.Sequential(*layers)
+
 
 class Resnet18(nn.Module):
     def __init__(self):
@@ -216,9 +218,9 @@ class Resnet18(nn.Module):
         x = self.maxpool(x)
 
         x = self.layer1(x)
-        feat8 = self.layer2(x) # 1/8
-        feat16 = self.layer3(feat8) # 1/16
-        feat32 = self.layer4(feat16) # 1/32
+        feat8 = self.layer2(x)  # 1/8
+        feat16 = self.layer3(feat8)  # 1/16
+        feat32 = self.layer4(feat16)  # 1/32
         return feat8, feat16, feat32
 
     def get_params(self):
@@ -228,19 +230,20 @@ class Resnet18(nn.Module):
                 wd_params.append(module.weight)
                 if not module.bias is None:
                     nowd_params.append(module.bias)
-            elif isinstance(module,  nn.BatchNorm2d):
+            elif isinstance(module, nn.BatchNorm2d):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
+
 
 class ConvBNReLU(nn.Module):
     def __init__(self, in_chan, out_chan, ks=3, stride=1, padding=1, *args, **kwargs):
         super(ConvBNReLU, self).__init__()
         self.conv = nn.Conv2d(in_chan,
-                out_chan,
-                kernel_size = ks,
-                stride = stride,
-                padding = padding,
-                bias = False)
+                              out_chan,
+                              kernel_size=ks,
+                              stride=stride,
+                              padding=padding,
+                              bias=False)
         self.bn = nn.BatchNorm2d(out_chan)
         self.init_weight()
 
@@ -254,6 +257,7 @@ class ConvBNReLU(nn.Module):
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+
 
 class BiSeNetOutput(nn.Module):
     def __init__(self, in_chan, mid_chan, n_classes, *args, **kwargs):
@@ -284,11 +288,12 @@ class BiSeNetOutput(nn.Module):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
 
+
 class AttentionRefinementModule(nn.Module):
     def __init__(self, in_chan, out_chan, *args, **kwargs):
         super(AttentionRefinementModule, self).__init__()
         self.conv = ConvBNReLU(in_chan, out_chan, ks=3, stride=1, padding=1)
-        self.conv_atten = nn.Conv2d(out_chan, out_chan, kernel_size= 1, bias=False)
+        self.conv_atten = nn.Conv2d(out_chan, out_chan, kernel_size=1, bias=False)
         self.bn_atten = nn.BatchNorm2d(out_chan)
         self.sigmoid_atten = nn.Sigmoid()
         self.init_weight()
@@ -307,6 +312,7 @@ class AttentionRefinementModule(nn.Module):
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+
 
 class ContextPath(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -360,6 +366,7 @@ class ContextPath(nn.Module):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
 
+
 ### This is not used, since I replace this with the resnet feature with the same size
 class SpatialPath(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -394,22 +401,23 @@ class SpatialPath(nn.Module):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
 
+
 class FeatureFusionModule(nn.Module):
     def __init__(self, in_chan, out_chan, *args, **kwargs):
         super(FeatureFusionModule, self).__init__()
         self.convblk = ConvBNReLU(in_chan, out_chan, ks=1, stride=1, padding=0)
         self.conv1 = nn.Conv2d(out_chan,
-                out_chan//4,
-                kernel_size = 1,
-                stride = 1,
-                padding = 0,
-                bias = False)
-        self.conv2 = nn.Conv2d(out_chan//4,
-                out_chan,
-                kernel_size = 1,
-                stride = 1,
-                padding = 0,
-                bias = False)
+                               out_chan // 4,
+                               kernel_size=1,
+                               stride=1,
+                               padding=0,
+                               bias=False)
+        self.conv2 = nn.Conv2d(out_chan // 4,
+                               out_chan,
+                               kernel_size=1,
+                               stride=1,
+                               padding=0,
+                               bias=False)
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.init_weight()
@@ -442,6 +450,7 @@ class FeatureFusionModule(nn.Module):
             elif isinstance(module, nn.BatchNorm2d):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
+
 
 class BiSeNet(nn.Module):
     def __init__(self, n_classes, *args, **kwargs):
@@ -487,6 +496,7 @@ class BiSeNet(nn.Module):
                 nowd_params += child_nowd_params
         return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
 
+
 class Face_Skin(object):
     '''
     Inputs:
@@ -494,9 +504,10 @@ class Face_Skin(object):
     Outputs:
         mask    输出mask图片；
     '''
+
     def __init__(self, model_path, needs_index) -> None:
-        n_classes   = 19
-        self.model  = BiSeNet(n_classes=n_classes)
+        n_classes = 19
+        self.model = BiSeNet(n_classes=n_classes)
         self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
         self.model.eval()
 
@@ -516,25 +527,25 @@ class Face_Skin(object):
             retinaface_box = retinaface_boxes[0]
 
             # sub_face for seg skin
-            sub_image           = image.crop(retinaface_box)
+            sub_image = image.crop(retinaface_box)
 
             image_h, image_w, c = np.shape(np.uint8(sub_image))
-            PIL_img             = Image.fromarray(np.uint8(sub_image))
-            PIL_img             = PIL_img.resize((512, 512), Image.BILINEAR)
-            np_img              = np.uint8(PIL_img)
-            torch_img           = self.trans(PIL_img)
-            torch_img           = torch.unsqueeze(torch_img, 0)
+            PIL_img = Image.fromarray(np.uint8(sub_image))
+            PIL_img = PIL_img.resize((512, 512), Image.BILINEAR)
+            np_img = np.uint8(PIL_img)
+            torch_img = self.trans(PIL_img)
+            torch_img = torch.unsqueeze(torch_img, 0)
 
-            out                 = self.model(torch_img)[0]
-            model_mask          = out.squeeze(0).cpu().numpy().argmax(0)
-            
+            out = self.model(torch_img)[0]
+            model_mask = out.squeeze(0).cpu().numpy().argmax(0)
+
             sub_mask = np.zeros_like(model_mask)
             for index in self.needs_index:
                 sub_mask += np.uint8(model_mask == index)
 
             sub_mask = np.clip(sub_mask, 0, 1) * 255
             sub_mask = np.tile(np.expand_dims(cv2.resize(np.uint8(sub_mask), (image_w, image_h)), -1), [1, 1, 3])
-            
+
             # detect image
             total_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2], :] = sub_mask
             return Image.fromarray(np.uint8(total_mask))
