@@ -90,7 +90,7 @@ def easyphoto_train_forward(
     train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
     print("train_file_path : ", train_kohya_path)
     
-    # extensions/sd-webui-EasyPhoto/train_kohya_log.txt, use to cache log and flush to UI
+    # extensions/sd-webui-EasyPhoto_learn/train_kohya_log.txt, use to cache log and flush to UI
     cache_log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CACHE_LOG_FILE)
     print("cache_log_file_path   : ", cache_log_file_path)
     if platform.system() == 'Windows':

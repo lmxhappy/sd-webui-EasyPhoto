@@ -549,3 +549,8 @@ class Face_Skin(object):
             # detect image
             total_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2], :] = sub_mask
             return Image.fromarray(np.uint8(total_mask))
+
+if __name__ == '__main__':
+    model_path = '/Users/conan/Desktop/codes/sd-webui-EasyPhoto-main/models/face_skin.pth'
+    face_skin = Face_Skin(model_path, [12, 13])
+    mouth_mask = face_skin(input_image, retinaface_detection)
