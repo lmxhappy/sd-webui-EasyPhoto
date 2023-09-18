@@ -203,6 +203,9 @@ face_skin = None
 
 
 def test(user_ids, best_lora_weights, additional_prompt, multi_user_facecrop_ratio):
+    """
+
+    """
     input_prompts = []
     face_id_images = []
     roop_images = []
@@ -218,11 +221,13 @@ def test(user_ids, best_lora_weights, additional_prompt, multi_user_facecrop_rat
         # get best image after training
         best_outputs_paths = glob.glob(
             os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
+
         # get roop image
         if len(best_outputs_paths) > 0:
             face_id_image_path = best_outputs_paths[0]
         else:
             face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
+
         roop_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
 
         face_id_image = Image.open(face_id_image_path).convert("RGB")
@@ -347,8 +352,7 @@ def test2(second_denoising_strength, input_prompt_without_lora, color_shift_last
                 np.array(input_image_retinaface_box[2], np.int32) + face_width * 0.15, 0, w - 1)
 
             # get new input_mask
-            input_mask[input_image_retinaface_box[1]:input_image_retinaface_box[3],
-            input_image_retinaface_box[0]:input_image_retinaface_box[2]] = 255
+            input_mask[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2]] = 255
             input_mask = Image.fromarray(np.uint8(input_mask))
 
             # here we get the retinaface_box, we should use this Input box and face pixel to refine the output face pixel colors
@@ -492,11 +496,13 @@ def easyphoto_infer_forward(
 
     # create modelscope model
     if retinaface_detection is None:
+        # 探测有没有脸的
         retinaface_detection = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     if image_face_fusion is None:
         image_face_fusion = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
     if skin_retouching is None:
         try:
+            # 美化皮肤的
             skin_retouching = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch',
                                        model_revision='v1.0.2')
         except:
@@ -509,6 +515,7 @@ def easyphoto_infer_forward(
             logging.info("Portrait Enhancement model load error, but pass.")
     if face_skin is None:
         try:
+            # 用于找到嘴的mask，并排除掉嘴，不生成嘴
             face_skin = Face_Skin(
                 os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
                 [12, 13])
@@ -564,6 +571,8 @@ def easyphoto_infer_forward(
 
 
 def main():
+
+    selected_template_images = ""
     "upload image"
     init_image = ''
     additional_prompt = ''

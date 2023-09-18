@@ -7,12 +7,13 @@
 EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于训练与您相关的数字分身。建议使用 5 到 20 张肖像图片进行训练，最好是半身照片且不要佩戴眼镜（少量可以接受）。训练完成后，我们可以在推理部分生成图像。我们支持使用预设模板图片与上传自己的图片进行推理。  
 请阅读我们的开发者公约，共建美好社区 [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md)
 
-**新功能！！** 🔥🔥 我们目前支持多人生成。  
+**新功能！！** 🔥🔥 我们目前支持多人生成。     
+**新功能！！** 🔥🔥🔥🔥 我们目前支持不同预测基础模型，见证不一样的自己。  
 
 这些是我们的生成结果:
 ![results_1](images/results_1.jpg)
 ![results_2](images/results_2.jpg)
-![results_3](images/results_3.jpg)
+![results_3](images/results_3.jpg) 
 
 我们的ui界面如下:  
 **训练部分:**
@@ -21,6 +22,7 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 ![infer_ui](images/infer_ui.jpg)
 
 # 新功能
+- **支持不同预测基础模型。** [🔥🔥 2023.09.08]
 - **支持多人生成！添加缓存选项以优化推理速度。在UI上添加日志刷新。** [🔥🔥 2023.09.06]
 - 创建代码！现在支持 Windows 和 Linux。[🔥 2023.09.02]
 
@@ -162,5 +164,9 @@ EasyPhoto训练界面如下：
 本项目采用 [Apache License (Version 2.0)](https://github.com/modelscope/modelscope/blob/master/LICENSE).
 
 ## 联系我们
-使用[钉钉](https://www.dingtalk.com/)搜索群38250008552或扫描下列二维码加入群聊
-![join](images/erweima.jpg)
+1. 使用[钉钉](https://www.dingtalk.com/)搜索群38250008552或扫描下列二维码加入群聊
+2. 使用 微信 扫描右下二维码加入群聊
+<figure>
+<img src="images/erweima.jpg" width=300/>
+<img src="images/wechat.jpg" width=300/>
+</figure>
