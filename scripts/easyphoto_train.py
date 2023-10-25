@@ -127,6 +127,7 @@ def easyphoto_train_forward(
     if not os.path.exists(os.path.dirname(cache_log_file_path)):
         os.makedirs(os.path.dirname(cache_log_file_path), exist_ok=True)
 
+
     if platform.system() == 'Windows':
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug

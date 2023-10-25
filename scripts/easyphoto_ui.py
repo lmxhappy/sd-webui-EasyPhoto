@@ -579,7 +579,9 @@ def on_ui_tabs():
                             value="No task currently",
                             interactive=False
                         )
-                    
+
+                # selected_template_images是模版图片
+                # init_image是用户上传的图片
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
