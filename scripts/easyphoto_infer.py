@@ -484,6 +484,11 @@ def easyphoto_infer_forward(
                 replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
                 
                 # Fusion of user reference images and input images as canny input
+                fusion_image = None
+                tmp_fusion_image_mask = None
+                tmp_input_image_mask = None
+                tmp_mask_intersec = None
+                tmp_input_image = input_image
                 if roop_images[index] is not None and apply_face_fusion_before:
                     fusion_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG]
                     fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
@@ -492,6 +497,12 @@ def easyphoto_infer_forward(
                     # detect face area
                     fusion_image_mask = np.int32(np.float32(face_skin(fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]) > 128)
                     input_image_mask = np.int32(np.float32(face_skin(input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]) > 128)
+                    tmp_fusion_image_mask = face_skin(fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
+                    tmp_input_image_mask = face_skin(input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
+                    tmp_mask_intersec = np.uint8(fusion_image_mask * input_image_mask)
+                    tmp_mask_intersec = np.where(tmp_mask_intersec>0, 255, 0)
+                    tmp_mask_intersec = Image.fromarray(tmp_mask_intersec)
+
                     # paste back to photo
                     fusion_image = fusion_image * fusion_image_mask * input_image_mask + np.array(input_image) * (1 - fusion_image_mask * input_image_mask)
                     fusion_image = cv2.medianBlur(np.uint8(fusion_image), 3)
@@ -550,6 +561,17 @@ def easyphoto_infer_forward(
                     input_image_uint8 = np.array(first_diffusion_output_image) * face_skin_mask + np.array(input_image) * (1 - face_skin_mask)
                     first_diffusion_output_image = Image.fromarray(np.uint8(input_image_uint8))
 
+                # todo
+                outputs.append(replaced_input_image)
+                outputs.append(tmp_input_image)
+                outputs.append(fusion_image)
+                outputs.append(tmp_fusion_image_mask)
+                outputs.append(tmp_input_image_mask)
+                outputs.append(tmp_mask_intersec)
+                outputs.append(input_image)
+                outputs.append(input_mask)
+                outputs.append(first_diffusion_output_image)
+
                 if color_shift_middle:
                     # apply color shift
                     ep_logger.info("Start color shift middle.")
@@ -607,6 +629,13 @@ def easyphoto_infer_forward(
                 ep_logger.info("Start Second diffusion.")
                 controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
                 second_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+
+                # todo
+                # outputs.append(first_diffusion_output_image)
+                outputs.append(fusion_image)
+                outputs.append(input_image)
+                outputs.append(input_mask)
+                outputs.append(second_diffusion_output_image)
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:
@@ -752,4 +781,6 @@ def easyphoto_infer_forward(
         retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None; face_recognition = None
 
     torch.cuda.empty_cache()
-    return loop_message, outputs, face_id_outputs  
+    loop_message += "\nreplace_img, first_fusion_img, first_sd_image, first_sd_image_mask, first_sd_output_image, second_fusion_img, second_sd_input_image, second_sd_input_image_mask, second_sd_output_image"
+
+    return loop_message, outputs, face_id_outputs
