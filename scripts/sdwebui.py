@@ -240,7 +240,9 @@ def t2i_call(
         origin_sd_model_checkpoint  = ""
         origin_sd_vae               = ""
 
-    sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
+    # sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
+    sd_vae              = os.path.basename('/data2/mingxing6/stable-diffusion-webui/models/VAE/vae-ft-mse-840000-ema-pruned.ckpt')
+
     if sd_vae is not None:
         sd_vae = os.path.basename(vae_near_checkpoint = find_vae_near_checkpoint(sd_vae))
     else:
@@ -279,19 +281,42 @@ def t2i_call(
         if alwayson_scripts.name=='controlnet':
             p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
     
-    if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', sd_model_checkpoint)
+#     if sd_model_checkpoint != origin_sd_model_checkpoint:
+#         reload_model('sd_model_checkpoint', sd_model_checkpoint)
     
-    if origin_sd_vae != sd_vae:
-        reload_model('sd_vae', sd_vae)
+#     if origin_sd_vae != sd_vae:
+#         reload_model('sd_vae', sd_vae)
 
+    if sd_model_checkpoint != origin_sd_model_checkpoint:
+        shared.cmd_opts.ckpt = "/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"
+        sd_models.list_models()
+        reload_model('sd_model_checkpoint', sd_model_checkpoint)
+    if origin_sd_vae != sd_vae:
+        from  modules import sd_vae as sd_vae_module
+        sd_vae_file =   '/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/VAE/vae-ft-mse-840000-ema-pruned.ckpt'
+        vae_file, vae_source = sd_vae_module.resolve_vae(sd_vae).tuple()
+
+        sd_vae_module.reload_vae_weights(vae_file=sd_vae_file)
+        
     processed = processing.process_images(p_txt2img)
 
-    if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
-    if origin_sd_vae != sd_vae:
-        reload_model('sd_vae', origin_sd_vae)
+    # if sd_model_checkpoint != origin_sd_model_checkpoint:
+    #     reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
+    # if origin_sd_vae != sd_vae:
+    #     reload_model('sd_vae', origin_sd_vae)
 
+    if sd_model_checkpoint != origin_sd_model_checkpoint:
+        shared.cmd_opts.ckpt = "/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"
+        sd_models.list_models()
+        reload_model('sd_model_checkpoint', sd_model_checkpoint)
+        
+    if origin_sd_vae != sd_vae:
+        from  modules import sd_vae as sd_vae_module
+        sd_vae_file =   '/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/VAE/vae-ft-mse-840000-ema-pruned.ckpt'
+        vae_file, vae_source = sd_vae_module.resolve_vae(sd_vae).tuple()
+
+        sd_vae_module.reload_vae_weights(vae_file=sd_vae_file)
+        
     if len(processed.images) > 1:
         # get the generate image!
         h_0, w_0, c_0 = np.shape(processed.images[0])
@@ -351,6 +376,8 @@ def i2i_inpaint_call(
         sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
         sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
 ):
+    
+        
     if sampler is None:
         sampler = "Euler a"
     if steps is None:
@@ -365,13 +392,30 @@ def i2i_inpaint_call(
         origin_sd_model_checkpoint  = ""
         origin_sd_vae               = ""
 
-    sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
+    # sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
+    sd_vae              = os.path.basename('/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/VAE/vae-ft-mse-840000-ema-pruned.ckpt')
+  
+
     vae_near_checkpoint = find_vae_near_checkpoint(sd_vae)
     if vae_near_checkpoint is not None:
         sd_vae = os.path.basename(vae_near_checkpoint)
     else:
         sd_vae = None
 
+    if sd_model_checkpoint != origin_sd_model_checkpoint:
+        shared.cmd_opts.ckpt = "/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"
+        sd_models.list_models()
+        reload_model('sd_model_checkpoint', sd_model_checkpoint)
+        print('------------------')
+        
+    
+    if origin_sd_vae != sd_vae:
+        from  modules import sd_vae as sd_vae_module
+        sd_vae_file =   '/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/VAE/vae-ft-mse-840000-ema-pruned.ckpt'
+        # vae_file, vae_source = sd_vae_module.resolve_vae(sd_vae).tuple()
+
+        sd_vae_module.reload_vae_weights(vae_file=sd_vae_file)
+        
     p_img2img = StableDiffusionProcessingImg2Img(
         sd_model=origin_sd_model_checkpoint,
         outpath_samples=outpath_samples,
@@ -407,6 +451,8 @@ def i2i_inpaint_call(
         initial_noise_multiplier=initial_noise_multiplier
     )
 
+    scripts.load_scripts()
+    
     p_img2img.scripts = scripts.scripts_img2img
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
@@ -417,20 +463,21 @@ def i2i_inpaint_call(
         if alwayson_scripts.name=='controlnet':
             p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
     
-    if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', sd_model_checkpoint)
-    
-    if sd_vae is not None:
-        if origin_sd_vae != sd_vae:
-            reload_model('sd_vae', sd_vae)
+  
 
     processed = processing.process_images(p_img2img)
 
     if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
-    if sd_vae is not None:
-        if origin_sd_vae != sd_vae:
-            reload_model('sd_vae', origin_sd_vae)
+        shared.cmd_opts.ckpt = "/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"
+
+        sd_models.list_models()
+        reload_model('sd_model_checkpoint', sd_model_checkpoint)
+    if origin_sd_vae != sd_vae:
+        from  modules import sd_vae as sd_vae_module
+        sd_vae_file =   '/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/models/VAE/vae-ft-mse-840000-ema-pruned.ckpt'
+        # vae_file, vae_source = sd_vae_module.resolve_vae(sd_vae).tuple()
+
+        sd_vae_module.reload_vae_weights(vae_file=sd_vae_file)
 
     if len(processed.images) > 1:
         # get the generate image!
