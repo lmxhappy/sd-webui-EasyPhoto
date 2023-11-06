@@ -34,27 +34,34 @@ from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
 def test(sd_model_checkpoint, prompt='easyphoto_face, easyphoto, 1person, <lora:muxue:0.9><lora:FilmVelvia3:0.65>masterpiece, beauty'):
+
     first_diffusion_steps = 50
 
     first_denoising_strength = 0.45
     first_denoising_strength = 0.9999
 
+
     # second_diffusion_steps = 20
     # second_denoising_strength = 0.30
 
     crop_face_preprocess = True
-    seed = 12345
 
-    input_image = Image.open('./facechain_pose1.png')
-    input_mask = Image.open('./mask_image_mannual_small.jpeg')
+    seed = None
+    # sd_model_checkpoint = 'Chilloutmix-Ni-pruned-fp16-fix.safetensors'
+    input_image = Image.open('/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/extensions/sd-webui-EasyPhoto/scripts/facechain_pose1.png')
+    input_mask = Image.open('/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/extensions/sd-webui-EasyPhoto/scripts/mask_image_mannual_small.jpeg')
     first_diffusion_output_image = inpaint(input_image, input_mask, [],
                                            diffusion_steps=50,
                                            denoising_strength=first_denoising_strength,
                                            input_prompt=prompt, hr_scale=1.0, seed=seed,
                                            sd_model_checkpoint=sd_model_checkpoint)
-    first_diffusion_output_image.save('first_diffusion_output_image.jpg')
+
+    first_diffusion_output_image.save('/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/extensions/sd-webui-EasyPhoto/scripts/first_diffusion_output_image.jpg')
+    
+
 
 def resize_image(input_image, resolution, nearest=False, crop264=True):
+
     H, W, C = input_image.shape
     H = float(H)
     W = float(W)
@@ -234,7 +241,14 @@ def easyphoto_infer_forward(
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
-):
+): 
+    ep_logger.info(f'-----------------')
+    ep_logger.info(f'tabs:{tabs}')
+    ep_logger.info(f'user_ids:{user_ids}')
+    ep_logger.info(f'user_ids:{type(user_ids)}')
+    
+    test(sd_model_checkpoint)
+
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
@@ -414,6 +428,7 @@ def easyphoto_infer_forward(
         '''
         ep_logger.info(template_idx_info)
         try:
+            output_image = None
             # open the template image
             if tabs == 0 or tabs == 2:
                 template_image = Image.open(template_image).convert("RGB")
@@ -513,8 +528,9 @@ def easyphoto_infer_forward(
                 fusion_image = None
                 tmp_fusion_image_mask = None
                 tmp_input_image_mask = None
-                tmp_mask_intersec = None
                 tmp_input_image = input_image
+                tmp_mask_intersec = None
+
                 tmp_first_fusion_image = None
                 if roop_images[index] is not None and apply_face_fusion_before:
                     fusion_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG]
@@ -524,11 +540,15 @@ def easyphoto_infer_forward(
                     # detect face area
                     fusion_image_mask = np.int32(np.float32(face_skin(fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]) > 128)
                     input_image_mask = np.int32(np.float32(face_skin(input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]) > 128)
-                    tmp_fusion_image_mask = face_skin(fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
+
+                    tmp_fusion_image_mask =face_skin(fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
+
+
                     tmp_input_image_mask = face_skin(input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
                     tmp_mask_intersec = np.uint8(fusion_image_mask * input_image_mask)
                     tmp_mask_intersec = np.where(tmp_mask_intersec>0, 255, 0)
                     tmp_mask_intersec = Image.fromarray(np.uint8(tmp_mask_intersec))
+
 
                     # paste back to photo
                     fusion_image = fusion_image * fusion_image_mask * input_image_mask + np.array(input_image) * (1 - fusion_image_mask * input_image_mask)
@@ -577,6 +597,16 @@ def easyphoto_infer_forward(
                     # no color
                     controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
 
+                    controlnet_pairs=[]
+                    # # no canny
+                    # controlnet_pairs = [["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+                     # no pose
+                    # controlnet_pairs = [["canny", input_image, 0.50], ["color", input_image, 0.85]]
+                    # no color
+                    # controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
+                    
+                    ep_logger.info('--------no face_shape_match')
+                    
                     first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
                 else:
                     controlnet_pairs = [["openpose", input_image, 0.50]]
@@ -751,7 +781,9 @@ def easyphoto_infer_forward(
                     template_face_safe_box = template_face_safe_boxes[index]
                     output_image[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]] = np.array(loop_output_image, np.float32)[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]]
                 else:
-                    output_image = loop_output_image
+                    output_image = loop_output_image 
+            # todo
+            #output_image = None
 
             try:
                 if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1 or background_restore:
@@ -768,10 +800,12 @@ def easyphoto_infer_forward(
                     # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
                     denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
                     controlnet_pairs    = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
+
                     outputs.append(output_image)
                     outputs.append(output_mask)
                     output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
                     outputs.append(output_image)
+
             except Exception as e:
                 torch.cuda.empty_cache()
                 traceback.print_exc()
@@ -824,17 +858,22 @@ def easyphoto_infer_forward(
 
 
     torch.cuda.empty_cache()
-    loop_message += "\nreplace_img, first_fusion_img, first_sd_image, first_sd_image_mask, first_sd_output_image, second_fusion_img, second_sd_input_image, second_sd_input_image_mask, second_sd_output_image, last_image, third_sd_inut, third_sd_input_mask, third_sd_output_image"
 
-    return loop_message, outputs, face_id_outputs
+    # loop_message += "\nreplace_img, first_fusion_img, first_sd_image, first_sd_image_mask, first_sd_output_image, second_fusion_img, second_sd_input_image, second_sd_input_image_mask, second_sd_output_image, last_image, third_sd_inut, third_sd_input_mask, third_sd_output_image"
+    loop_message +="\nreplace_img, tmp_template_image, tmp_first_fusion_image, first_fusion_img, tmp_fusion_image_mask,tmp_input_image_mask,tmp_mask_intersec,first_sd_input_image, first_sd_input_image_mask, first_sd_output_image, second_fusion_img, second_sd_input_image, second_sd_input_image_mask, second_sd_output_image, last_image , third_sd_inut, third_sd_input_mask, third_sd_output_image"
+    
+    return loop_message, outputs, face_id_outputs  
 
 
 def main():
+    sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors"
+    selected_template_images = '["/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/extensions/sd-webui-EasyPhoto/models/training_templates/4.jpg"]'
 
-    selected_template_images = ""
-    "upload image"
-    init_image = ''
-    additional_prompt = ''
+    init_image = '/mnt/workspace/demos/stable_diffusion_easyphoto/stable-diffusion-webui/outputs/easyphoto-user-id-infos/muxue/ref_image.jpg'
+    additional_prompt = 'masterpiece, beauty'
+
+
+
 
     before_face_fusion_ratio = 0.5
     after_face_fusion_ratio = 0.5
@@ -853,15 +892,39 @@ def main():
     color_shift_middle = True
     color_shift_last = True
     seed = 12345
-    outputs = easyphoto_infer_forward(selected_template_images, init_image, additional_prompt,
-                                      before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps,
-                                      first_denoising_strength,
-                                      second_diffusion_steps, second_denoising_strength, \
-                                      seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after,
-                                      color_shift_middle,
-                                      color_shift_last, model_selected_tab, *uuids),
+
+    uuids = ['muxue']
+    import gradio as gr
+    model_selected_tab = 0
+
+    super_resolution = True
+    super_resolution_method='gpen'
+    skin_retouching_bool = True
+    display_score = False
+    
+    background_restore = False
+    background_restore_denoising_strength= 0.35
+    makeup_transfer=False
+    makeup_transfer_ratio=0.5
+    face_shape_match=False
+    sd_xl_input_prompt="upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32"
+    sd_xl_resolution="(1344, 768)"
+    uploaded_template_images = None
+    
+    outputs = easyphoto_infer_forward(sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
+        before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
+        seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last,
+                                      super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
+        background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids)
+    
+    print(outputs)
+    imgs = outputs[1]
+    for i, img in enumerate(imgs):
+        img.save(f'img_{i}.jpg')
+    
 
 
 if __name__ == '__main__':
     main()
+
 
