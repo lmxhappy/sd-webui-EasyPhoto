@@ -512,7 +512,7 @@ class Face_Skin(object):
         self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
         self.model.eval()
 
-        self.cuda  = torch.cuda.is_available()
+        self.cuda = torch.cuda.is_available()
         if self.cuda:
             self.model.cuda()
 

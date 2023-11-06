@@ -33,6 +33,27 @@ from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
+def test(sd_model_checkpoint, prompt='easyphoto_face, easyphoto, 1person, <lora:muxue:0.9><lora:FilmVelvia3:0.65>masterpiece, beauty'):
+    first_diffusion_steps = 50
+
+    first_denoising_strength = 0.45
+    first_denoising_strength = 0.9999
+
+    # second_diffusion_steps = 20
+    # second_denoising_strength = 0.30
+
+    crop_face_preprocess = True
+    seed = 12345
+
+    input_image = Image.open('./facechain_pose1.png')
+    input_mask = Image.open('./mask_image_mannual_small.jpeg')
+    first_diffusion_output_image = inpaint(input_image, input_mask, [],
+                                           diffusion_steps=50,
+                                           denoising_strength=first_denoising_strength,
+                                           input_prompt=prompt, hr_scale=1.0, seed=seed,
+                                           sd_model_checkpoint=sd_model_checkpoint)
+    first_diffusion_output_image.save('first_diffusion_output_image.jpg')
+
 def resize_image(input_image, resolution, nearest=False, crop264=True):
     H, W, C = input_image.shape
     H = float(H)
@@ -545,7 +566,17 @@ def easyphoto_infer_forward(
                 # First diffusion, facial reconstruction
                 ep_logger.info("Start First diffusion.")
                 if not face_shape_match:
-                    controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+                    # controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+
+                    # no canny
+                    controlnet_pairs = [["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+
+                    # no pose
+                    controlnet_pairs = [["canny", input_image, 0.50], ["color", input_image, 0.85]]
+
+                    # no color
+                    controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
+
                     first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
                 else:
                     controlnet_pairs = [["openpose", input_image, 0.50]]
@@ -737,7 +768,10 @@ def easyphoto_infer_forward(
                     # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
                     denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
                     controlnet_pairs    = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
+                    outputs.append(output_image)
+                    outputs.append(output_mask)
                     output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+                    outputs.append(output_image)
             except Exception as e:
                 torch.cuda.empty_cache()
                 traceback.print_exc()
@@ -790,7 +824,7 @@ def easyphoto_infer_forward(
 
 
     torch.cuda.empty_cache()
-    loop_message += "\nreplace_img, first_fusion_img, first_sd_image, first_sd_image_mask, first_sd_output_image, second_fusion_img, second_sd_input_image, second_sd_input_image_mask, second_sd_output_image"
+    loop_message += "\nreplace_img, first_fusion_img, first_sd_image, first_sd_image_mask, first_sd_output_image, second_fusion_img, second_sd_input_image, second_sd_input_image_mask, second_sd_output_image, last_image, third_sd_inut, third_sd_input_mask, third_sd_output_image"
 
     return loop_message, outputs, face_id_outputs
 
@@ -830,3 +864,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
